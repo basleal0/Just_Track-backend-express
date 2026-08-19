@@ -3,17 +3,20 @@ import type { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pg from "pg";
-import { createHabitSchema } from "@/schemas/habit.schema.js";
+import { createHabitSchema } from "../schemas/habit.schema.js";
 
 // Initialize Pool and PrismaClient
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
-export const updateHabitLog = async (req: Request, res: Response): Promise<void> => {
+export const updateHabitLog = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   try {
-    const { habitId, date } = req.params;
-    const { completed = true } = req.body;
+    const date = req.query.date as string;
+    const habitId = req.params.habitId as string;
 
     // 1. Parse date string and normalize to UTC midnight for strict matching
     const parsedDate = new Date(date);
@@ -26,8 +29,8 @@ export const updateHabitLog = async (req: Request, res: Response): Promise<void>
       Date.UTC(
         parsedDate.getUTCFullYear(),
         parsedDate.getUTCMonth(),
-        parsedDate.getUTCDate()
-      )
+        parsedDate.getUTCDate(),
+      ),
     );
 
     // 2. Verify target habit exists
@@ -40,7 +43,10 @@ export const updateHabitLog = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    // 3. Upsert HabitLog record using composite unique constraint @@unique([habitId, date])
+    // 3. Read completed state from request body and Upsert HabitLog record
+    const completed = Boolean((req.body as any)?.completed);
+
+    // Upsert HabitLog record using composite unique constraint @@unique([habitId, date])
     const log = await prisma.habitLog.upsert({
       where: {
         habitId_date: {
@@ -59,7 +65,6 @@ export const updateHabitLog = async (req: Request, res: Response): Promise<void>
         completedAt: completed ? new Date() : null,
       },
     });
-
     // 4. Return success response
     res.status(200).json({
       message: "Habit log updated successfully",
@@ -73,7 +78,10 @@ export const updateHabitLog = async (req: Request, res: Response): Promise<void>
     });
   }
 };
-export const getHabitLogs = async (req: Request, res: Response): Promise<void> => {
+export const getHabitLogs = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   try {
     const { date, from, to } = req.query;
 
@@ -90,18 +98,20 @@ export const getHabitLogs = async (req: Request, res: Response): Promise<void> =
         Date.UTC(
           parsedDate.getUTCFullYear(),
           parsedDate.getUTCMonth(),
-          parsedDate.getUTCDate()
-        )
+          parsedDate.getUTCDate(),
+        ),
       );
       whereCondition.date = utcMidnight;
-    } 
+    }
     // Date range filter (from - to)
     else if (from && to && typeof from === "string" && typeof to === "string") {
       const parsedFrom = new Date(from);
       const parsedTo = new Date(to);
 
       if (isNaN(parsedFrom.getTime()) || isNaN(parsedTo.getTime())) {
-        res.status(400).json({ error: "Invalid from/to date format. Use YYYY-MM-DD" });
+        res
+          .status(400)
+          .json({ error: "Invalid from/to date format. Use YYYY-MM-DD" });
         return;
       }
 
@@ -109,15 +119,15 @@ export const getHabitLogs = async (req: Request, res: Response): Promise<void> =
         Date.UTC(
           parsedFrom.getUTCFullYear(),
           parsedFrom.getUTCMonth(),
-          parsedFrom.getUTCDate()
-        )
+          parsedFrom.getUTCDate(),
+        ),
       );
       const toUtc = new Date(
         Date.UTC(
           parsedTo.getUTCFullYear(),
           parsedTo.getUTCMonth(),
-          parsedTo.getUTCDate()
-        )
+          parsedTo.getUTCDate(),
+        ),
       );
 
       whereCondition.date = {

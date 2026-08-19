@@ -4,8 +4,8 @@ import {
   getNotifications,
   updateNotification,
   deleteNotification,
-} from "@/controllers/notification.controller.js";
-import { requireAuth } from "@/middlewares/auth.middlewares.js";
+} from "../controllers/notification.controller.js";
+import { requireAuth } from "../middlewares/auth.middlewares.js";
 
 const router = Router();
 

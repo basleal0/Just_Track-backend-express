@@ -8,7 +8,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import pg from "pg";
 import { signupSchema, loginSchema } from "../schemas/auth.schema.js";
 import { email } from "zod";
-
+const isProduction = process.env.NODE_ENV === "production";
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
@@ -112,9 +112,9 @@ export const login = (
       );
       res.cookie("token", token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        maxAge: 7 * 24 * 60 * 60 * 1000,
+        secure: isProduction, // Requires HTTPS in production
+        sameSite: isProduction ? "none" : "lax", // "none" allows cross-domain cookies
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       });
       const { password, ...userWithoutPassword } = user;
       return res.status(200).json({

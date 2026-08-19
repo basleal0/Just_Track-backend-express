@@ -12,14 +12,12 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
-
 export const createNotification = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
   try {
-    const userId = (req.user as any).id; // Automatically injected by Passport JWT
-
+    const userId = (req.user as any)?.id as string | undefined; // Automatically injected by Passport JWT
 
     if (!userId) {
       res.status(401).json({ error: "Unauthorized: Missing userId" });
@@ -62,8 +60,8 @@ export const getNotifications = async (
   res: Response,
 ): Promise<void> => {
   try {
-     const userId = (req.user as any).id; // Automatically injected by Passport JWT
-     
+    const userId = (req.user as any).id; // Automatically injected by Passport JWT
+
     if (!userId) {
       res.status(401).json({ error: "Unauthorized: Missing userId" });
       return;
@@ -90,7 +88,11 @@ export const updateNotification = async (
   res: Response,
 ): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    if (!id) {
+      res.status(400).json({ error: "Missing notification id parameter" });
+      return;
+    }
 
     const validation = updateNotificationSchema.safeParse(req.body);
     if (!validation.success) {
@@ -131,7 +133,11 @@ export const deleteNotification = async (
   res: Response,
 ): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    if (!id) {
+      res.status(400).json({ error: "Missing notification id parameter" });
+      return;
+    }
 
     const notificationExists = await prisma.notification.findUnique({
       where: { id },

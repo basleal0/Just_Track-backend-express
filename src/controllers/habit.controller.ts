@@ -3,14 +3,14 @@ import type { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pg from "pg";
-import { createHabitSchema } from "@/schemas/habit.schema.js";
+import { createHabitSchema } from "../schemas/habit.schema.js";
 
 // Initialize Pool and PrismaClient
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
-export const createHabit = async (req: Request, res: Response): Promise => {
+export const createHabit = async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = (req.user as any).id; // Automatically injected by Passport JWT
 
@@ -70,7 +70,7 @@ export const getHabitById = async (
   res: Response,
 ): Promise<void> => {
   try {
-    const { id } = req.params;
+   const id = req.params.id as string;
 
     // Fetch only the habit matching the ID
     const habit = await prisma.habit.findUnique({
