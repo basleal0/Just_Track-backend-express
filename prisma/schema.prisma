@@ -1,13 +1,175 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+  
+
+}
+
+// ==========================================
+// ENUMS
+// ==========================================
+
+enum Category {
+  HEALTH
+  MIND
+  PRODUCTIVITY
+}
+
+enum Frequency {
+  EVERY_DAY
+  WEEKDAYS
+  WEEKENDS
+}
+
+// ==========================================
+// CORE MODELS
+// ==========================================
+
+model User {
+  id            String          @id @default(uuid())
+  email         String          @unique
+  password      String?         // Nullable for Google Auth users
+  fullName      String
+  avatarUrl     String?
+  isPremium     Boolean         @default(false)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  // Relationships
+  settings      UserSettings?
+  passkeys      Passkey[]
+  habits        Habit[]
+  notifications Notification[]
+
+  @@map("users")
+}
+
+model UserSettings {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  dailyReminders Boolean  @default(true)
+  streakAlerts   Boolean  @default(true)
+  darkMode       Boolean  @default(false)
+  themeAccent    String   @default("#6C63FF")
+  timezone       String   @default("UTC")
+  
+  updatedAt      DateTime @updatedAt
+
+  @@map("user_settings")
+}
+
+model Passkey {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  credentialId String   @unique // base64url credential identifier
+  publicKey    String   // base64url public key
+  counter      Int      @default(0)
+  transports   String[] // Array of string transports e.g. ["internal", "hybrid"]
+  deviceName   String?
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("passkeys")
+}
+
+model Habit {
+  id            String    @id @default(uuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name          String
+  category      Category
+  frequency     Frequency
+  coverImageUrl String?
+  reminderTime  String?   // "HH:mm" format e.g. "07:30"
+  isArchived    Boolean   @default(false)
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relationships
+  logs          HabitLog[]
+
+  @@map("habits")
+}
+
+model HabitLog {
+  id          String    @id @default(uuid())
+  habitId     String
+  habit       Habit     @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  
+  date        DateTime  // Store at UTC midnight for strict date matching
+  completed   Boolean   @default(true)
+  completedAt DateTime?
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Ensures only one log per habit for any given calendar date
+  @@unique([habitId, date])
+  @@map("habit_logs")
+}
+
+model Notification {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  notificationId String   // Local/OS notification ID passed from app
+  title          String
+  body           String
+  done           Boolean  @default(false)
+  
+  createdAt      DateTime @default(now())
+
+  @@map("notifications")
+}
+
+model FeedItem {
+  id          String   @id @default(uuid())
+  slug        String   @unique
+  title       String
+  body        String   @db.Text
+  imageUrl    String?
+  publishedAt DateTime @default(now())
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("feed_items")
+}
+
+// ==========================================
+// HELPER & STATE TABLES
+// ==========================================
+
+model OtpCode {
+  id        String   @id @default(uuid())
+  email     String
+  code      String   // 6-digit OTP code
+  attempts  Int      @default(0)
+  verified  Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@map("otp_codes")
+}
+
+model PasskeyChallenge {
+  id        String   @id @default(uuid())
+  challenge String   @unique
+  email     String?  // Associated user email for authentication options
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("passkey_challenges")
 }
