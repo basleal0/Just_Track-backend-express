@@ -9,19 +9,11 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
-// Extracts userId from auth middleware (req.user.id) or 'x-user-id' header
-const getUserId = (req: Request): string | null => {
-  return (
-    (req as any).user?.id ||
-    (req.headers["x-user-id"] as string) ||
-    (req.query.userId as string) ||
-    null
-  );
-};
+
 
 export const getSettings = async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = getUserId(req);
+     const userId = (req.user as any).id; // Automatically injected by Passport JWT
 
     if (!userId) {
       res.status(401).json({ error: "Unauthorized: Missing userId in request or x-user-id header" });
@@ -47,7 +39,8 @@ export const getSettings = async (req: Request, res: Response): Promise<void> =>
 
 export const updateSettings = async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = getUserId(req);
+     const userId = (req.user as any).id; // Automatically injected by Passport JWT
+
 
     if (!userId) {
       res.status(401).json({ error: "Unauthorized: Missing userId in request or x-user-id header" });

@@ -12,22 +12,14 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
-const getUserId = (req: Request): string | null => {
-  return (
-    (req as any).user?.id ||
-    (req.headers["x-user-id"] as string) ||
-    (req.query.userId as string) ||
-    req.body?.userId ||
-    null
-  );
-};
 
 export const createNotification = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
   try {
-    const userId = getUserId(req);
+    const userId = (req.user as any).id; // Automatically injected by Passport JWT
+
 
     if (!userId) {
       res.status(401).json({ error: "Unauthorized: Missing userId" });
@@ -70,8 +62,8 @@ export const getNotifications = async (
   res: Response,
 ): Promise<void> => {
   try {
-    const userId = getUserId(req);
-
+     const userId = (req.user as any).id; // Automatically injected by Passport JWT
+     
     if (!userId) {
       res.status(401).json({ error: "Unauthorized: Missing userId" });
       return;

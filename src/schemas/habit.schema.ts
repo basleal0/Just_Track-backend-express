@@ -2,7 +2,6 @@ import { z } from "zod";
 import { Category, Frequency } from "@prisma/client";
 
 export const createHabitSchema = z.object({
-  userId: z.string().uuid("Invalid User ID format"),
   name: z.string().min(1, "Habit name is required").max(100),
   category: z.nativeEnum(Category, {
     message: "Category must be HEALTH, MIND, or PRODUCTIVITY",

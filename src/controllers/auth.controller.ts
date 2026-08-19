@@ -1,20 +1,23 @@
-import type { Request, Response } from "express";
+import "dotenv/config";
+import type { Request, Response, NextFunction } from "express";
+import passport from "passport";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { PrismaClient } from "@prisma/client";
-import { registerSchema } from "@/schemas/auth.schema.js";
 import { PrismaPg } from "@prisma/adapter-pg";
+import pg from "pg";
+import { signupSchema, loginSchema } from "../schemas/auth.schema.js";
 
-const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
 
-const prisma = new PrismaClient({
-  adapter,
-});
+const JWT_SECRET = process.env.JWT_SECRET || "fallback_super_secret_jwt_key";
 
-export const register = async (req: Request, res: Response): Promise<void> => {
+// POST /auth/signup
+export const signup = async (req: Request, res: Response): Promise<void> => {
   try {
-    // 1. Validate incoming body against Zod schema
-    const validation = registerSchema.safeParse(req.body);
+    const validation = signupSchema.safeParse(req.body);
     if (!validation.success) {
       res.status(400).json({
         error: "Validation failed",
@@ -25,29 +28,20 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
     const { email, password, fullName } = validation.data;
 
-    // 2. Check if user already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
-    });
-
+    const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
       res.status(409).json({ error: "Email is already registered" });
       return;
     }
 
-    // 3. Hash password
-    const saltRounds = 10;
-    const hashedPassword = await bcrypt.hash(password, saltRounds);
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-    // 4. Create User and default UserSettings atomically
     const user = await prisma.user.create({
       data: {
         email,
         password: hashedPassword,
         fullName,
-        settings: {
-          create: {}, // Auto-creates UserSettings with schema defaults
-        },
+        settings: { create: {} },
       },
       select: {
         id: true,
@@ -56,25 +50,61 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         avatarUrl: true,
         isPremium: true,
         createdAt: true,
-        settings: true,
       },
     });
 
-    // 5. Generate JWT Access Token
-    const token = jwt.sign(
-      { userId: user.id, email: user.email },
-      process.env.JWT_SECRET || "fallback_secret_key",
-      { expiresIn: "7d" },
-    );
+    const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, {
+      expiresIn: "7d",
+    });
 
-    // 6. Return response
     res.status(201).json({
       message: "User registered successfully",
-      user,
       token,
+      user,
     });
-  } catch (error) {
-    console.error("Registration Error:", error);
-    res.status(500).json({ error: "Internal server error" });
+  } catch (error: any) {
+    console.error("Signup Error:", error);
+    res.status(500).json({
+      error: "Internal server error",
+      message: error?.message || String(error),
+    });
   }
+};
+
+// POST /auth/login (using Passport custom callback)
+export const login = (req: Request, res: Response, next: NextFunction): void => {
+  const validation = loginSchema.safeParse(req.body);
+  if (!validation.success) {
+    res.status(400).json({
+      error: "Validation failed",
+      details: validation.error.flatten().fieldErrors,
+    });
+    return;
+  }
+
+  passport.authenticate(
+    "local",
+    { session: false },
+    (err: any, user: any, info: any) => {
+      if (err) {
+        return res.status(500).json({ error: "Internal server error", message: err.message });
+      }
+
+      if (!user) {
+        return res.status(401).json({ error: info?.message || "Authentication failed" });
+      }
+
+      const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, {
+        expiresIn: "7d",
+      });
+
+      const { password, ...userWithoutPassword } = user;
+
+      return res.status(200).json({
+        message: "Login successful",
+        token,
+        user: userWithoutPassword,
+      });
+    }
+  )(req, res, next);
 };

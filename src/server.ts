@@ -1,6 +1,8 @@
 import express from "express";
 import habitRoutes from "./routes/habit.routes.js";
 import authRoutes from "./routes/auth.routes.js";
+import "./config/password.js";
+import passport from "passport";
 import habitLogRoutes from "./routes/habitLog.route.js"
 import settingRoutes from "./routes/setting.routes.js"
 import notificationRoutes from "./routes/notification.routes.js"
@@ -8,7 +10,7 @@ const app = express();
 
 
 app.use(express.json());
-
+app.use(passport.initialize());
 // Routes
 app.use("/auth", authRoutes);
 app.use("/habits", habitRoutes);
