@@ -3,6 +3,7 @@ import cors from "cors";
 import habitRoutes from "./routes/habit.routes.js";
 import authRoutes from "./routes/auth.routes.js";
 import "./config/password.js";
+import { setupSwagger } from "./config/swagger.js";
 import cookieParser from "cookie-parser";
 import passport from "passport";
 import habitLogRoutes from "./routes/habitLog.route.js";
@@ -26,6 +27,7 @@ app.use(
   }),
 );
 app.use(express.json());
+setupSwagger(app);
 app.use(cookieParser());
 app.use(passport.initialize());
 // Routes
