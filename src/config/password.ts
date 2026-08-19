@@ -11,7 +11,14 @@ const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 const JWT_SECRET = process.env.JWT_SECRET || "fallback_super_secret_jwt_key";
-
+// Helper extractor function to pull token from cookies
+const cookieExtractor = (req: Request): string | null => {
+  let token = null;
+  if (req && req.cookies) {
+    token = req.cookies["token"]; // Reads req.cookies.token set by cookie-parser
+  }
+  return token;
+};
 // 1. Local Strategy for POST /auth/login
 passport.use(
   new LocalStrategy(
@@ -32,15 +39,18 @@ passport.use(
       } catch (error) {
         return done(error);
       }
-    }
-  )
+    },
+  ),
 );
 
 // 2. JWT Strategy for Protecting Routes
 passport.use(
   new JwtStrategy(
     {
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: ExtractJwt.fromExtractors([
+        cookieExtractor, // Checks req.cookies.token first
+        ExtractJwt.fromAuthHeaderAsBearerToken(), // Fallback to Authorization: Bearer <token>
+      ]),
       secretOrKey: JWT_SECRET,
     },
     async (jwtPayload, done) => {
@@ -63,8 +73,8 @@ passport.use(
       } catch (error) {
         return done(error, false);
       }
-    }
-  )
+    },
+  ),
 );
 
 export default passport;

@@ -7,6 +7,7 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pg from "pg";
 import { signupSchema, loginSchema } from "../schemas/auth.schema.js";
+import { email } from "zod";
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
@@ -72,7 +73,11 @@ export const signup = async (req: Request, res: Response): Promise<void> => {
 };
 
 // POST /auth/login (using Passport custom callback)
-export const login = (req: Request, res: Response, next: NextFunction): void => {
+export const login = (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void => {
   const validation = loginSchema.safeParse(req.body);
   if (!validation.success) {
     res.status(400).json({
@@ -87,24 +92,39 @@ export const login = (req: Request, res: Response, next: NextFunction): void => 
     { session: false },
     (err: any, user: any, info: any) => {
       if (err) {
-        return res.status(500).json({ error: "Internal server error", message: err.message });
+        return res
+          .status(500)
+          .json({ error: "Internal server error", message: err.message });
       }
 
       if (!user) {
-        return res.status(401).json({ error: info?.message || "Authentication failed" });
+        return res
+          .status(401)
+          .json({ error: info?.message || "Authentication failed" });
       }
 
-      const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, {
-        expiresIn: "7d",
+      const token = jwt.sign(
+        { userId: user.id, email: user.email },
+        JWT_SECRET,
+        {
+          expiresIn: "7d",
+        },
+      );
+      res.cookie("token", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 7 * 24 * 60 * 60 * 1000,
       });
-
       const { password, ...userWithoutPassword } = user;
-
       return res.status(200).json({
         message: "Login successful",
-        token,
-        user: userWithoutPassword,
+        user: {
+          id: user.id,
+          email: user.email,
+          fullName: user.fullName,
+        },
       });
-    }
+    },
   )(req, res, next);
 };

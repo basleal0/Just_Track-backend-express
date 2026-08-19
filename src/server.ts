@@ -2,6 +2,7 @@ import express from "express";
 import habitRoutes from "./routes/habit.routes.js";
 import authRoutes from "./routes/auth.routes.js";
 import "./config/password.js";
+import cookieParser from "cookie-parser";
 import passport from "passport";
 import habitLogRoutes from "./routes/habitLog.route.js"
 import settingRoutes from "./routes/setting.routes.js"
@@ -10,6 +11,7 @@ const app = express();
 
 
 app.use(express.json());
+app.use(cookieParser());
 app.use(passport.initialize());
 // Routes
 app.use("/auth", authRoutes);
