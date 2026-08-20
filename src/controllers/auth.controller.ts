@@ -8,7 +8,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import pg from "pg";
 import { signupSchema, loginSchema } from "../schemas/auth.schema.js";
 
-const isProduction = process.env.NODE_ENV === "production";
+const isProduction = true
 const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:3000";
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
@@ -142,6 +142,7 @@ export const googleLogin = (req: Request, res: Response, next: NextFunction): vo
   passport.authenticate("google", {
     scope: ["profile", "email"],
     session: false,
+    
   })(req, res, next);
 };
 
