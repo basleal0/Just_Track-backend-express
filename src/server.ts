@@ -10,7 +10,7 @@ import habitLogRoutes from "./routes/habitLog.route.js";
 import settingRoutes from "./routes/setting.routes.js";
 import notificationRoutes from "./routes/notification.routes.js";
 const allowedOrigins = [
-  "http://localhost:5173", // Local React/Vite development
+  "https://localhost:3000", // Local React/Vite development
   process.env.CLIENT_URL, // Live production frontend URL
   process.env.TESTING_URL,
 ].filter(Boolean) as string[];

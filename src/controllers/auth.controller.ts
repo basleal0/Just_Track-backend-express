@@ -1,6 +1,7 @@
 import "dotenv/config";
 import type { Request, Response, NextFunction } from "express";
 import passport from "passport";
+import { OAuth2Client } from "google-auth-library";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { PrismaClient } from "@prisma/client";
@@ -138,49 +139,112 @@ export const login = (
 };
 
 // GET /auth/google
-export const googleLogin = (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): void => {
-  passport.authenticate("google", {
-    scope: ["profile", "email"],
-    session: false,
-  })(req, res, next);
-};
 
-// GET /auth/google/callback
-export const googleCallback = (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): void => {
-  passport.authenticate(
-    "google",
-    { session: false },
-    (err: any, user: any, info: any) => {
-      if (err || !user) {
-        const errorMsg = encodeURIComponent(
-          info?.message || "Google authentication failed",
-        );
-        return res.redirect(`${CLIENT_URL}/login?error=${errorMsg}`);
-      }
 
-      const token = jwt.sign(
-        { userId: user.id, email: user.email },
-        JWT_SECRET,
-        { expiresIn: "7d" },
-      );
 
-      res.cookie("token", token, {
-        httpOnly: true,
-        secure: true,
-        sameSite: "none",
-        maxAge: 7 * 24 * 60 * 60 * 1000,
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+export const googleLogin = async (req: Request, res: Response) => {
+  try {
+    const { idToken } = req.body;
+
+    if (!idToken) {
+      return res.status(400).json({ message: "ID Token is required." });
+    }
+
+    // 1. Verify token with Google's public keys
+    const ticket = await googleClient.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    if (!payload || !payload.email) {
+      return res.status(400).json({ message: "Invalid Google Token." });
+    }
+
+    const { email, name, picture, sub: googleId } = payload;
+
+    // 2. Find or create user in your database
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      user = await User.create({
+        email,
+        name,
+        avatar: picture,
+        googleId,
       });
+    }
 
-      // Redirect to frontend application after setting cookie
-      return res.redirect(`${CLIENT_URL}/dashboard`);
-    },
-  )(req, res, next);
+    // 3. Generate your application JWT
+    const token = jwt.sign(
+      { userId: user._id, email: user.email },
+      process.env.JWT_SECRET!,
+      { expiresIn: "7d" }
+    );
+
+    // 4. Set HttpOnly Cookie (or send in JSON body)
+    res.cookie("accessToken", token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "none",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+
+    return res.status(200).json({
+      success: true,
+      user: { id: user._id, email: user.email, name: user.name },
+      token, // Option to return token directly
+    });
+  } catch (error: any) {
+    console.error("Google Auth Error:", error);
+    return res.status(401).json({ message: "Google authentication failed." });
+  }
 };
+// export const googleLogin = (
+//   req: Request,
+//   res: Response,
+//   next: NextFunction,
+// ): void => {
+//   passport.authenticate("google", {
+//     scope: ["profile", "email"],
+//     session: false,
+//   })(req, res, next);
+// };
+
+// // GET /auth/google/callback
+// export const googleCallback = (
+//   req: Request,
+//   res: Response,
+//   next: NextFunction,
+// ): void => {
+//   passport.authenticate(
+//     "google",
+//     { session: false },
+//     (err: any, user: any, info: any) => {
+//       if (err || !user) {
+//         const errorMsg = encodeURIComponent(
+//           info?.message || "Google authentication failed",
+//         );
+//         return res.redirect(`${CLIENT_URL}/login?error=${errorMsg}`);
+//       }
+
+//       const token = jwt.sign(
+//         { userId: user.id, email: user.email },
+//         JWT_SECRET,
+//         { expiresIn: "7d" },
+//       );
+
+//       res.cookie("token", token, {
+//         httpOnly: true,
+//         secure: true,
+//         sameSite: "none",
+//         maxAge: 7 * 24 * 60 * 60 * 1000,
+//       });
+
+//       // Redirect to frontend application after setting cookie
+//       return res.redirect(`${CLIENT_URL}/dashboard`);
+//     },
+//   )(req, res, next);
+// };

@@ -3,7 +3,6 @@ import {
   signup,
   login,
   googleLogin,
-  googleCallback,
 } from "../controllers/auth.controller.js";
 
 const router = Router();
@@ -89,6 +88,5 @@ router.get("/google", googleLogin);
  *       302:
  *         description: Authenticates user, sets HTTP-only JWT cookie, and redirects to client dashboard
  */
-router.get("/google/callback", googleCallback);
 
 export default router;
