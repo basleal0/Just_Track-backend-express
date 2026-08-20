@@ -8,8 +8,8 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import pg from "pg";
 import { signupSchema, loginSchema } from "../schemas/auth.schema.js";
 
-const isProduction = true
-const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:3000";
+const isProduction = true;
+const CLIENT_URL = process.env.CLIENT_URL || "https://localhost:3000";
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
@@ -138,11 +138,14 @@ export const login = (
 };
 
 // GET /auth/google
-export const googleLogin = (req: Request, res: Response, next: NextFunction): void => {
+export const googleLogin = (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void => {
   passport.authenticate("google", {
     scope: ["profile", "email"],
     session: false,
-    
   })(req, res, next);
 };
 
@@ -157,7 +160,9 @@ export const googleCallback = (
     { session: false },
     (err: any, user: any, info: any) => {
       if (err || !user) {
-        const errorMsg = encodeURIComponent(info?.message || "Google authentication failed");
+        const errorMsg = encodeURIComponent(
+          info?.message || "Google authentication failed",
+        );
         return res.redirect(`${CLIENT_URL}/login?error=${errorMsg}`);
       }
 
@@ -169,8 +174,8 @@ export const googleCallback = (
 
       res.cookie("token", token, {
         httpOnly: true,
-        secure: isProduction,
-        sameSite: isProduction ? "none" : "lax",
+        secure: true,
+        sameSite: "none",
         maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 
