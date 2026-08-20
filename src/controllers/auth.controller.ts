@@ -163,39 +163,43 @@ export const googleLogin = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Invalid Google Token." });
     }
 
-    const { email, name, picture, sub: googleId } = payload;
+    const { email, name } = payload;
 
-    // 2. Find or create user in your database
-    let user = await User.findOne({ email });
+    // 2. Find or create user in PostgreSQL via Prisma
+    let user = await prisma.user.findUnique({
+      where: { email },
+    });
 
     if (!user) {
-      user = await User.create({
-        email,
-        name,
-        avatar: picture,
-        googleId,
+      user = await prisma.user.create({
+        data: {
+          email,
+          fullName: name || "Google User",
+          password: "", // OAuth users do not require a local password
+          settings: { create: {} },
+        },
       });
     }
 
-    // 3. Generate your application JWT
+    // 3. Generate application JWT using Prisma user.id
     const token = jwt.sign(
-      { userId: user._id, email: user.email },
-      process.env.JWT_SECRET!,
+      { userId: user.id, email: user.email },
+      JWT_SECRET,
       { expiresIn: "7d" }
     );
 
-    // 4. Set HttpOnly Cookie (or send in JSON body)
-    res.cookie("accessToken", token, {
+    // 4. Set HttpOnly Cookie
+    res.cookie("token", token, {
       httpOnly: true,
-      secure: true,
-      sameSite: "none",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
     return res.status(200).json({
       success: true,
-      user: { id: user._id, email: user.email, name: user.name },
-      token, // Option to return token directly
+      user: { id: user.id, email: user.email, fullName: user.fullName },
+      token,
     });
   } catch (error: any) {
     console.error("Google Auth Error:", error);
