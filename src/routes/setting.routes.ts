@@ -40,12 +40,19 @@ router.get("/", requireAuth, getSettings);
  *           schema:
  *             type: object
  *             properties:
- *               theme:
+ *               themeAccent:
  *                 type: string
- *                 example: "dark"
- *               notificationsEnabled:
+ *                 example: "#6C63FF"
+ *               dailyReminders:
  *                 type: boolean
  *                 example: true
+ *               streakAlerts:
+ *                  type: booleean
+ *                  example: true
+ *               darkMode:
+ *                   type: boolean
+ *                    example: false
+  
  *     responses:
  *       200:
  *         description: Settings updated successfully

@@ -17,7 +17,7 @@ const router = Router();
  *             type: object
  *             required: [fullName, email, password]
  *             properties:
- *               name:
+ *               fullName:
  *                 type: string
  *                 example: John Doe
  *               email:
