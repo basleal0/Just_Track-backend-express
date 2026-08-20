@@ -1,6 +1,7 @@
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import { Strategy as JwtStrategy, ExtractJwt } from "passport-jwt";
+import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
@@ -57,6 +58,53 @@ passport.use(new JwtStrategy({
             return done(null, false);
         }
         return done(null, user); // Attaches user object to req.user
+    }
+    catch (error) {
+        return done(error, false);
+    }
+}));
+// 3. Google Strategy for OAuth
+passport.use(new GoogleStrategy({
+    clientID: process.env.GOOGLE_CLIENT_ID || "",
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+    callbackURL: process.env.GOOGLE_CALLBACK_URL ||
+        "http://localhost:3000/auth/google/callback",
+}, async (_accessToken, _refreshToken, profile, done) => {
+    try {
+        const email = profile.emails?.[0]?.value;
+        const googleId = profile.id;
+        const fullName = profile.displayName;
+        if (!email) {
+            return done(new Error("No email profile retrieved from Google"), false);
+        }
+        // 1. Look for existing user with this googleId
+        let user = await prisma.user.findUnique({
+            where: { googleId },
+        });
+        // 2. If not found by googleId, check by email address
+        if (!user) {
+            user = await prisma.user.findUnique({
+                where: { email },
+            });
+            if (user) {
+                // Link existing account with googleId
+                user = await prisma.user.update({
+                    where: { id: user.id },
+                    data: { googleId },
+                });
+            }
+            else {
+                // Create a new user account
+                user = await prisma.user.create({
+                    data: {
+                        email,
+                        fullName,
+                        googleId,
+                    },
+                });
+            }
+        }
+        return done(null, user);
     }
     catch (error) {
         return done(error, false);

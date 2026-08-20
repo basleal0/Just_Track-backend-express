@@ -7,6 +7,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import pg from "pg";
 import { signupSchema, loginSchema } from "../schemas/auth.schema.js";
 const isProduction = process.env.NODE_ENV === "production";
+const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:3000";
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
@@ -48,6 +49,12 @@ export const signup = async (req, res) => {
         const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, {
             expiresIn: "7d",
         });
+        res.cookie("token", token, {
+            httpOnly: true,
+            secure: isProduction,
+            sameSite: isProduction ? "none" : "lax",
+            maxAge: 7 * 24 * 60 * 60 * 1000,
+        });
         res.status(201).json({
             message: "User registered successfully",
             token,
@@ -83,24 +90,47 @@ export const login = (req, res, next) => {
                 .status(401)
                 .json({ error: info?.message || "Authentication failed" });
         }
-        const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, {
-            expiresIn: "7d",
-        });
+        const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: "7d" });
         res.cookie("token", token, {
             httpOnly: true,
-            secure: isProduction, // Requires HTTPS in production
-            sameSite: isProduction ? "none" : "lax", // "none" allows cross-domain cookies
-            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+            secure: isProduction,
+            sameSite: isProduction ? "none" : "lax",
+            maxAge: 7 * 24 * 60 * 60 * 1000,
         });
-        const { password, ...userWithoutPassword } = user;
         return res.status(200).json({
             message: "Login successful",
+            token,
             user: {
                 id: user.id,
                 email: user.email,
                 fullName: user.fullName,
             },
         });
+    })(req, res, next);
+};
+// GET /auth/google
+export const googleLogin = (req, res, next) => {
+    passport.authenticate("google", {
+        scope: ["profile", "email"],
+        session: false,
+    })(req, res, next);
+};
+// GET /auth/google/callback
+export const googleCallback = (req, res, next) => {
+    passport.authenticate("google", { session: false }, (err, user, info) => {
+        if (err || !user) {
+            const errorMsg = encodeURIComponent(info?.message || "Google authentication failed");
+            return res.redirect(`${CLIENT_URL}/login?error=${errorMsg}`);
+        }
+        const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: "7d" });
+        res.cookie("token", token, {
+            httpOnly: true,
+            secure: isProduction,
+            sameSite: isProduction ? "none" : "lax",
+            maxAge: 7 * 24 * 60 * 60 * 1000,
+        });
+        // Redirect to frontend application after setting cookie
+        return res.redirect(`${CLIENT_URL}/dashboard`);
     })(req, res, next);
 };
 //# sourceMappingURL=auth.controller.js.map

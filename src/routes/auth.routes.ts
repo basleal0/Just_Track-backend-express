@@ -1,5 +1,10 @@
 import { Router } from "express";
-import { signup, login } from "../controllers/auth.controller.js";
+import {
+  signup,
+  login,
+  googleLogin,
+  googleCallback,
+} from "../controllers/auth.controller.js";
 
 const router = Router();
 
@@ -61,5 +66,29 @@ router.post("/register", signup);
  *         description: Invalid email or password
  */
 router.post("/login", login);
+
+/**
+ * @openapi
+ * /auth/google:
+ *   get:
+ *     summary: Initiate Google OAuth 2.0 sign-in flow
+ *     tags: [Auth]
+ *     responses:
+ *       302:
+ *         description: Redirects browser to Google OAuth consent screen
+ */
+router.get("/google", googleLogin);
+
+/**
+ * @openapi
+ * /auth/google/callback:
+ *   get:
+ *     summary: Google OAuth 2.0 redirect callback endpoint
+ *     tags: [Auth]
+ *     responses:
+ *       302:
+ *         description: Authenticates user, sets HTTP-only JWT cookie, and redirects to client dashboard
+ */
+router.get("/google/callback", googleCallback);
 
 export default router;

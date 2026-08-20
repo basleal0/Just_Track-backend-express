@@ -13,9 +13,9 @@ const router = Router();
  *         application/json:
  *           schema:
  *             type: object
- *             required: [name, email, password]
+ *             required: [fullName, email, password]
  *             properties:
- *               name:
+ *               fullName:
  *                 type: string
  *                 example: John Doe
  *               email:

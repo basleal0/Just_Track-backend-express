@@ -12,6 +12,7 @@ import notificationRoutes from "./routes/notification.routes.js";
 const allowedOrigins = [
     "http://localhost:5173", // Local React/Vite development
     process.env.CLIENT_URL, // Live production frontend URL
+    process.env.TESTING_URL,
 ].filter(Boolean);
 const app = express();
 app.use(cors({

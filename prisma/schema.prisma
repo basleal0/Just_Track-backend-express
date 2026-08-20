@@ -32,7 +32,8 @@ model User {
   id            String          @id @default(uuid())
   email         String          @unique
   password      String?         // Nullable for Google Auth users
-  fullName      String
+  fullName      String?
+  googleId      String?  @unique
   avatarUrl     String?
   isPremium     Boolean         @default(false)
   createdAt     DateTime        @default(now())
