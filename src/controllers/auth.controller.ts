@@ -1,7 +1,6 @@
 import "dotenv/config";
 import type { Request, Response, NextFunction } from "express";
 import passport from "passport";
-import { OAuth2Client } from "google-auth-library";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { PrismaClient } from "@prisma/client";
@@ -9,8 +8,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import pg from "pg";
 import { signupSchema, loginSchema } from "../schemas/auth.schema.js";
 
-const isProduction = true;
-const CLIENT_URL = process.env.CLIENT_URL || "https://localhost:3000";
+const isProduction = process.env.NODE_ENV === "production";
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
@@ -138,57 +136,56 @@ export const login = (
   )(req, res, next);
 };
 
-// GET /auth/google
-
-
-
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-
-export const googleLogin = async (req: Request, res: Response) => {
+// POST /auth/google
+export const googleLogin = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
   try {
-    const { idToken } = req.body;
+    const { idToken: accessToken } = req.body;
 
-    if (!idToken) {
-      return res.status(400).json({ message: "ID Token is required." });
+    if (!accessToken) {
+      return res.status(400).json({ message: "Access Token is required." });
     }
 
-    // 1. Verify token with Google's public keys
-    const ticket = await googleClient.verifyIdToken({
-      idToken,
-      audience: process.env.GOOGLE_CLIENT_ID,
-    });
+    // Verify token directly using Google's userinfo API
+    const googleRes = await fetch(
+      "https://www.googleapis.com/oauth2/v3/userinfo",
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      },
+    );
 
-    const payload = ticket.getPayload();
-    if (!payload || !payload.email) {
-      return res.status(400).json({ message: "Invalid Google Token." });
+    if (!googleRes.ok) {
+      return res.status(401).json({ message: "Invalid Google Token." });
     }
 
+    const payload = (await googleRes.json()) as { email?: string; name?: string };
     const { email, name } = payload;
 
-    // 2. Find or create user in PostgreSQL via Prisma
-    let user = await prisma.user.findUnique({
-      where: { email },
-    });
+    if (!email) {
+      return res.status(400).json({ message: "Google account has no valid email." });
+    }
+
+    let user = await prisma.user.findUnique({ where: { email } });
 
     if (!user) {
       user = await prisma.user.create({
         data: {
           email,
           fullName: name || "Google User",
-          password: "", // OAuth users do not require a local password
+          password: "",
           settings: { create: {} },
         },
       });
     }
 
-    // 3. Generate application JWT using Prisma user.id
     const token = jwt.sign(
       { userId: user.id, email: user.email },
       JWT_SECRET,
-      { expiresIn: "7d" }
+      { expiresIn: "7d" },
     );
 
-    // 4. Set HttpOnly Cookie
     res.cookie("token", token, {
       httpOnly: true,
       secure: isProduction,
@@ -206,49 +203,3 @@ export const googleLogin = async (req: Request, res: Response) => {
     return res.status(401).json({ message: "Google authentication failed." });
   }
 };
-// export const googleLogin = (
-//   req: Request,
-//   res: Response,
-//   next: NextFunction,
-// ): void => {
-//   passport.authenticate("google", {
-//     scope: ["profile", "email"],
-//     session: false,
-//   })(req, res, next);
-// };
-
-// // GET /auth/google/callback
-// export const googleCallback = (
-//   req: Request,
-//   res: Response,
-//   next: NextFunction,
-// ): void => {
-//   passport.authenticate(
-//     "google",
-//     { session: false },
-//     (err: any, user: any, info: any) => {
-//       if (err || !user) {
-//         const errorMsg = encodeURIComponent(
-//           info?.message || "Google authentication failed",
-//         );
-//         return res.redirect(`${CLIENT_URL}/login?error=${errorMsg}`);
-//       }
-
-//       const token = jwt.sign(
-//         { userId: user.id, email: user.email },
-//         JWT_SECRET,
-//         { expiresIn: "7d" },
-//       );
-
-//       res.cookie("token", token, {
-//         httpOnly: true,
-//         secure: true,
-//         sameSite: "none",
-//         maxAge: 7 * 24 * 60 * 60 * 1000,
-//       });
-
-//       // Redirect to frontend application after setting cookie
-//       return res.redirect(`${CLIENT_URL}/dashboard`);
-//     },
-//   )(req, res, next);
-// };
