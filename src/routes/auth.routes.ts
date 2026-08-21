@@ -1,9 +1,5 @@
 import { Router } from "express";
-import {
-  signup,
-  login,
-  googleLogin,
-} from "../controllers/auth.controller.js";
+import { signup, login, googleLogin } from "../controllers/auth.controller.js";
 
 const router = Router();
 
@@ -69,24 +65,26 @@ router.post("/login", login);
 /**
  * @openapi
  * /auth/google:
- *   get:
- *     summary: Initiate Google OAuth 2.0 sign-in flow
+ *   post:
+ *     summary: Authenticate user using Google token
  *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [idToken]
+ *             properties:
+ *               idToken:
+ *                 type: string
+ *                 example: "ya29.a0..."
  *     responses:
- *       302:
- *         description: Redirects browser to Google OAuth consent screen
+ *       200:
+ *         description: Google authentication successful
+ *       401:
+ *         description: Invalid or expired Google token
  */
-router.get("/google", googleLogin);
-
-/**
- * @openapi
- * /auth/google/callback:
- *   get:
- *     summary: Google OAuth 2.0 redirect callback endpoint
- *     tags: [Auth]
- *     responses:
- *       302:
- *         description: Authenticates user, sets HTTP-only JWT cookie, and redirects to client dashboard
- */
+router.post("/google", googleLogin); // FIXED: changed GET to POST
 
 export default router;
